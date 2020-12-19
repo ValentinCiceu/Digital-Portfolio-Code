@@ -6,17 +6,18 @@ library(tidyverse)
 library(ggplot2)
 library(gridExtra)
 library(cowplot)
-library(sqldf)
+library(sqldf) # <- you might not have this installed on your system. run install.packages("sqldf"). Used to write sql syntax in r code for quicker and more readble code
 library(semTools)
 library(pastecs)
 library(sjstats) 
 library(userfriendlyscience)
 
+# make sure directory is in local repository
 data <- read.csv("sperformance-dataset.csv", na.strings=c("na"," ","",".","NA"), header = TRUE)
 # using sql sytax to make filtering easier to write, quicker and more readable
 hyp1_score_data <- sqldf("select mg1,mg2,mg3,pg1,pg2,pg3 from data where mg1 > 0 and mg2 > 0 and mg3 > 0 and pg1 > 0 and pg2 > 0 and pg3 > 0")
 
-# Better form of summary statisitcs in R usinf the psych library
+# Better form of summary statisitcs in R using the psych library. Provides lots of useful information on descriptive measures
 describe(hyp1_score_data)
 
 # To build visual normalisation charts
@@ -43,7 +44,7 @@ qqnorm(hyp1_score_data$mG3,main='mG3')+qqline(hyp1_score_data$mG3, col=2)
 
 
 
-# Get the Kurtosis and Skew values of mG1
+# Get the Kurtosis and Skew values of mG1 for assesment normalisation
 mG1_skew <- semTools::skew(hyp1_score_data$mG1)
 mG1_kurt <- semTools::kurtosis(hyp1_score_data$mG1)
 
@@ -52,7 +53,7 @@ mG1_skew[1]/mG1_skew[2]
 mG1_kurt[1]/mG1_kurt[2]
 
 
-# Get the Kurtosis and Skew values of mG2
+# Get the Kurtosis and Skew values of mG2 for assesment normalisation
 mG2_skew <- semTools::skew(hyp1_score_data$mG2)
 mG2_kurt <- semTools::kurtosis(hyp1_score_data$mG2)
 
@@ -72,12 +73,15 @@ mG3_kurt[1]/mG3_kurt[2]
 
 mG1<- abs(scale(hyp1_score_data$mG1))
 
+# Check how much of data lies outside of 95 and 99 percentile ( Z score measurement) of mg1
 FSA::perc(as.numeric(mG1), 1.96, "gt")
 FSA::perc(as.numeric(mG1), 3.29, "gt")
 
 
 mG2<- abs(scale(hyp1_score_data$mG2))
 
+
+# Check how much of data lies outside of 95 and 99 percentile ( Z score measurement) of mg1
 FSA::perc(as.numeric(mG2), 1.96, "gt")
 FSA::perc(as.numeric(mG2), 3.29, "gt")
 
@@ -86,19 +90,19 @@ mG1<- abs(scale(hyp1_score_data$mG3))
 FSA::perc(as.numeric(mG1), 1.96, "gt")
 FSA::perc(as.numeric(mG1), 3.29, "gt")
 
-#Scatterplot relationship 
+#Scatterplot relationship of mG1 and dependent variable of mG3 which will be used for predictive model
 scatter <- ggplot(hyp1_score_data, aes(hyp1_score_data$mG1, hyp1_score_data$mG3))
 
-#Add a regression line
+#Add a regression line to see how the data points lie between the line and if it's positve or negative
 scatter + geom_point() + geom_smooth(method = "lm", colour = "Red", se = F) + labs(x = "First grades in maths (mG1)", y = "Final Grades Maths (mG3)") 
 
-#Scatterplot relationship 
+#Scatterplot relationship of mG2 and dependent variable of mG3 which will be used for predictive model
 scatter <- ggplot(hyp1_score_data, aes(hyp1_score_data$mG2, hyp1_score_data$mG3))
 
 #Add a regression line
 scatter + geom_point() + geom_smooth(method = "lm", colour = "Red", se = F) + labs(x = "First grades in maths (mG2)", y = "Final Grades Maths (mG3)") 
 
-#Pearson test between mG1 to mG3
+#Pearson test between mG1 to mG3 as part of correlation testing for validity of variables in the predictive model in future and clarify hypothesis as seen in report
 stats::cor.test(hyp1_score_data$mG1, hyp1_score_data$mG3, method='pearson')
 
 
@@ -106,22 +110,23 @@ stats::cor.test(hyp1_score_data$mG1, hyp1_score_data$mG3, method='pearson')
 stats::cor.test(hyp1_score_data$mG2, hyp1_score_data$mG3, method='pearson')
 
 
-# performing T-test
-# First prepare the test
+# performing T-test to determine if there is difference between groups
+# First prepare the test by filtering out 0 score in grades as mentioned in report
 t_test_data <- sqldf("select * from data where mg1 > 0 and mg2 > 0 and mg3 > 0 and pg1 > 0 and pg2 > 0 and pg3 > 0")
 
 
 # Performing T-test
-# Describe the variables
+# Describe the variables, better than summary
 psych::describeBy(t_test_data$mG3, t_test_data$sex, mat=TRUE)
-# Using levene's test to test variance
+
+# Using levene's test to test variance for homogeneity
 car::leveneTest(mG3 ~ sex, data=t_test_data)
 
 # Perfomring the T-test
 stats::t.test(mG3~sex,var.equal=TRUE,data=t_test_data)
 
 
-# Performing Cohen's d
+# Performing Cohen's d to get the effect size
 res <- stats::t.test(mG3~sex,var.equal=TRUE,data=t_test_data)
 effcd=round((2*res$statistic)/sqrt(res$parameter),2)
 effectsize::t_to_d(t = res$statistic, res$parameter)
@@ -134,7 +139,7 @@ psych::describeBy(t_test_data$mG3, t_test_data$guardian.m, mat=TRUE)
 car::leveneTest(mG3 ~ guardian.m, data=t_test_data)
 
 
-# Anova test for Hypothesis dealing with mG1 andf traveltime.m
+# Anova test for Hypothesis dealing with mG1 and  traveltime.m (testing difference with more that two groups)
 # Check the statistical description of variable of interest
 psych::describeBy(t_test_data$mG3, t_test_data$traveltime.m, mat=TRUE)
 
@@ -143,7 +148,7 @@ psych::describeBy(t_test_data$mG3, t_test_data$traveltime.m, mat=TRUE)
 stats::bartlett.test(mG3~ traveltime.m, data=t_test_data)
 
 
-# One-way Anova test 
+# One-way Anova test, no statistically significance was found for traveltime.m
 anova_result<-userfriendlyscience::oneway(as.factor(t_test_data$traveltime.m),y=t_test_data$mG3,posthoc='Tukey')
 anova_result
 

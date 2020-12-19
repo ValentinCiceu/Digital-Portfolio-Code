@@ -25,10 +25,10 @@ library(regclass)
 # Make sure the data is in the local directory
 data <- read.csv("sperformance-dataset.csv", na.strings=c("na"," ","",".","NA"), header = TRUE)
 
-# removing the 0 score from the grades
+# removing the 0 score from the grades as mentioned in explore section of portfolio
 norm_score_data <- sqldf("select * from data where mg1 > 0 and mg2 > 0 and mg3 > 0 and pg1 > 0 and pg2 > 0 and pg3 > 0")
 
-# simple linear regression model
+# simple linear regression model, good for model comparison
 model1<-lm(norm_score_data$mG3~norm_score_data$mG1)
 anova(model1)
 summary(model1)
@@ -37,25 +37,27 @@ stargazer(model1, type="text")
 # result is 1.425 + 0.901
 
 
-# Multiple linear regression on the grades
+# Multiple linear regression on the grades past and final
 model2<-lm(norm_score_data$mG3~norm_score_data$mG2+norm_score_data$mG1)
 anova(model2)
 summary(model2)
+# use this to get info on model 
 stargazer(model2, type="text") #Tidy output of all the required stats
 lm.beta(model2)
+# comparing the two models, simplelinear and multi linear
 stargazer(model1, model2, type="text") #Quick model comparison
 
 model_metrics <- augment(model2)
 
 
-# homocedasticity graph
+# Each graph as seen in porfolio to see the performance of the multi linear regression
 options(repr.plot.width = 16, repr.plot.height = 10)
 par(mfrow = c(2, 2))
 plot(model2)
-plot(model2, 1)
-plot(model2, 2)
-plot(model2, 3)
-plot(model2, 4)
+plot(model2, 1) # Residuals vs fitted (for linear relationship)
+plot(model2, 2) # Normal QQ (for normality)
+plot(model2, 3) # Scale Location (for testing Homoscedasticity)
+plot(model2, 4) # Cook's distance. good with finding outliers
 
 # copy of the main data to use dummy variables
 norm_score_data_dummy <- norm_score_data
@@ -69,11 +71,11 @@ norm_score_data_dummy$traveltimeShort = ifelse(norm_score_data_dummy$traveltime.
 
 
 model3<-lm(formula = mG3 ~ traveltimeLong + traveltimeShort ,data = norm_score_data_dummy)
-stargazer(model3, type="text") #Quick model comparison
+stargazer(model3, type="text") #Quick model comparison to see how the dummy variables did
 summary(model3)
 
 
-# dummy variables for studytime
+# dummy variables for studytime, same concept as above
 norm_score_data_dummy$studytimeLong = ifelse(norm_score_data_dummy$studytime.m >=3,1,0)
 norm_score_data_dummy$studytimeShort = ifelse(norm_score_data_dummy$studytime.m <=2,1,0)
 
@@ -89,7 +91,7 @@ norm_score_data_dummy$genderMale = ifelse(norm_score_data_dummy$sex == "M",1,0)
 norm_score_data_dummy$genderFemale = ifelse(norm_score_data_dummy$sex == "F",1,0)
 
 
-# checking significance of studytime
+# checking significance of gender
 modelSex<-lm(norm_score_data_dummy$mG3~norm_score_data_dummy$genderMale+norm_score_data_dummy$genderFemale)
 stargazer(modelSex, type="text") #Quick model comparison
 summary(modelSex)
@@ -101,11 +103,12 @@ model5<-lm(norm_score_data_dummy$mG3~norm_score_data_dummy$sex)
 stargazer(model5, type="text") #Quick model comparison
 summary(model5)
 
+# final multi linear regression model with all dummy variables, reported in the portfolio
 final_model = lm(formula=mG3 ~ genderMale + studytimeLong + traveltimeLong , data = norm_score_data_dummy)
 stargazer(final_model, type="text") #Quick model comparison
 summary(final_model)
 
-# Showing assumption scores
+# Showing assumption scores. same explanation as above
 plot(final_model, 1)
 plot(final_model, 2)
 plot(final_model, 3)
@@ -119,11 +122,11 @@ logistic_data <- norm_score_data
 logistic_data$passed = ifelse(logistic_data$mG3 >=10,1,0)
 logistic_data$studytimeLong = ifelse(logistic_data$studytime.m >=3,1,0)
 logistic_data$traveltimeLong = ifelse(logistic_data$traveltime.m >=3,1,0)
-#Make sure categorical data is used as factors
+#Make sure categorical data is used as factors, using MLR dummy variables 
 logmodel1 <- glm(passed ~ studytimeLong + traveltimeLong + sex, data = logistic_data, na.action = na.exclude, family = binomial(link=logit))
 #Full summary of the model
 summary(logmodel1)
-#Chi-square plus significance
+#Chi-square plus significance. Came out as the model being statistically insignificant P> 0.05, good to report on this
 lmtest::lrtest(logmodel1)
 #Chi-square and Pseudo R2 calculation 
 modelChi <- logmodel1$null.deviance - logmodel1$deviance
@@ -140,7 +143,7 @@ chisq.prob <- 1 - pchisq(modelChi, chidf)
 chisq.prob
 
 
-#Output the sensitivity, specificity, and ROC plot
+#Output the sensitivity, specificity, and ROC plot, cheking the AUC, found it to be weak as expected
 Epi::ROC(form=logistic_data$passed ~ logistic_data$studytimeLong + logistic_data$sex, plot="ROC")
 
 
@@ -155,7 +158,7 @@ stargazer(logmodel1, type="text")
 #confusion matrix
 regclass::confusion_matrix(logmodel1)
 
-#Collinearity
+#Collinearity, these pass the range which is good
 vifmodel<-car::vif(logmodel1)#You can ignore the warning messages, GVIF^(1/(2*Df)) is the value of interest
 vifmodel
 #Tolerance
@@ -168,14 +171,14 @@ generalhoslem::logitgof(logistic_data$passed, fitted(logmodel1))
 
 
 # building logisitic regression on mG1, mG2, mG3
-#Make sure categorical data is used as factors
+#Make sure categorical data is used as factors same as above
 logmodel2 <- glm(passed ~ mG1 + mG2 , data = logistic_data, na.action = na.exclude, family = binomial(link=logit))
 summary(logmodel2)
 
-#Chi-square plus significance
+#Chi-square plus significance, this resulted in the model being statistically significant!
 lmtest::lrtest(logmodel2)
 
-#Output the sensitivity, specificity, and ROC plot
+#Output the sensitivity, specificity, and ROC plot, AUC was .9 therefore very strong!
 Epi::ROC(form=logistic_data$passed ~ logistic_data$mG1 + logistic_data$mG2, plot="ROC")
 
 #Pseudo Rsquared 
@@ -187,7 +190,7 @@ stargazer(logmodel2, type="text")
 #confusion matrix
 regclass::confusion_matrix(logmodel2)
 
-#Collinearity
+#Collinearity, passed all ranges
 vifmodel<-car::vif(logmodel2)#You can ignore the warning messages, GVIF^(1/(2*Df)) is the value of interest
 vifmodel
 #Tolerance

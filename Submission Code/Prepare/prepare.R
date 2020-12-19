@@ -13,7 +13,7 @@ summary(data)
 # Better form of summary statisitcs in R usinf the psych library
 describe(data)
 
-# Distribution graphs
+# Distribution graphs to get a sense of how the numerical values are represented
 gg<-ggplot(data,aes(age))
 gg<-gg+labs(x="age")
 gg<-gg+geom_histogram(binwidth=1, colour="black", aes(y=..density.., fill=..count..))
@@ -37,7 +37,7 @@ plot_grid(plotlist = plot_list)
 
 
 
-#Boxplots
+#Boxplots for more information visually
 # hold all theplots created in the loop
 box_plot_list <- list()
 for(i in col_names){
